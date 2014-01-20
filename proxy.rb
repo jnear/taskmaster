@@ -51,9 +51,11 @@ class Proxy
     domain = get_host_without_www(uri).split(".").last(2).join(".")
     puts "Requested domain " + domain.to_s
     
-    # Now we have to compare the domain calculated above to the list
-    # in $tasks of the domains we're allowed to access right now
-    # if the request domain is not there, then return 404 or something
+    # close the socket and quit unless we're allowed to access this domain
+    unless $tasks.has_value? domain
+      to_client.close
+      return
+    end
 
     # Show what got requested
     #puts((" %4s "%verb) + url)

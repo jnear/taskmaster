@@ -53,6 +53,7 @@ class Proxy
     
     # close the socket and quit unless we're allowed to access this domain
     unless $tasks.has_value? domain or domain == 'getbootstrap.com'
+      puts "Denying!"
       to_client.close
       return
     end

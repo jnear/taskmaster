@@ -1,7 +1,6 @@
 require 'fileutils'
 require 'webrick'
-
-require_relative 'proxy'
+require 'webrick/httpproxy'
 
 $tasks = Hash.new
 
@@ -37,6 +36,25 @@ class DeleteTask < WEBrick::HTTPServlet::AbstractServlet
   end
 end
 
+proxy_handler = lambda do |req, res|
+  #puts "[REQUEST] " + req.request_line
+  puts "unparsed uri is " + req.unparsed_uri.to_s
+  uri = req.unparsed_uri.to_s
+  no_http = uri.gsub('http://', '')
+  only_domain = no_http.split('/').first
+
+  host, port = only_domain.split(":", 2)
+  domain = host.split(".").last(2).join(".").to_s
+
+  puts "requesting domain " + domain.to_s
+
+  unless $tasks.has_value? domain or domain == 'getbootstrap.com'
+    puts "DENIED"
+    res.header['content-type'] = 'text/html'
+    res.header.delete('content-encoding')
+    res.body = "Access is denied."
+  end
+end
 
 WEBrick::HTTPUtils::DefaultMimeTypes['rhtml'] = 'text/html'
 server = WEBrick::HTTPServer.new :Port => 8000, :DocumentRoot => root, :RequestCallback => cb
@@ -44,16 +62,18 @@ server = WEBrick::HTTPServer.new :Port => 8000, :DocumentRoot => root, :RequestC
 server.mount("/new_task", NewTask)
 server.mount("/delete_task", DeleteTask)
 
-proxy = Proxy.new
+proxy = WEBrick::HTTPProxyServer.new :Port => 8080, :AccessLog => [], :ProxyContentHandler => proxy_handler
+
+
 trap 'INT' do
   server.shutdown
-  raise Interrupt
+  proxy.shutdown
 end
 
+puts "Starting server..."
+Thread.new { server.start }
 
-Thread.new {
-  server.start
-}
+puts "Starting proxy..."
+proxy.start
 
-proxy.run 8080
-
+puts "All done!"
